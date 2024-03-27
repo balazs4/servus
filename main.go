@@ -16,13 +16,16 @@ func main() {
 			http.ServeFile(w, r, name)
 			return
 		}
-
-		w.Write([]byte(fmt.Sprintf("<h2>%s</h2>", time.Now())))
 		file, err := os.Open(name)
+		defer file.Close()
 		if err != nil {
 			return
 		}
-    io.Copy(w, file);
+		w.Write([]byte(fmt.Sprintf("<h2>%s</h2>", time.Now())))
+		io.Copy(w, file)
 	})
-	http.ListenAndServe(":3000", nil)
+	err := http.ListenAndServe(":3000", nil)
+	if err != nil {
+		panic(err)
+	}
 }
