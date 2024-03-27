@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -21,7 +22,7 @@ func main() {
 		if err != nil {
 			return
 		}
-		file.WriteTo(w)
+    io.Copy(w, file);
 	})
 	http.ListenAndServe(":3000", nil)
 }
