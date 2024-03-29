@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -11,6 +12,7 @@ import (
 )
 
 func main() {
+	logger := log.New(os.Stderr, "[servus] ", log.LstdFlags)
 	watcher, watcherr := fsnotify.NewWatcher()
 	if watcherr != nil {
 		panic(watcherr)
@@ -21,9 +23,9 @@ func main() {
 		for {
 			select {
 			case event, ok := <-watcher.Events:
-				fmt.Printf("event=%s, ok=%t\n", event, ok)
+				logger.Printf("ok=%t event=%s\n", ok, event)
 			case err, ok := <-watcher.Errors:
-				fmt.Printf("err=%s, ok=%t\n", err, ok)
+				logger.Printf("ok=%t, err=%s\n", ok, err)
 			}
 		}
 	}()
@@ -37,15 +39,8 @@ func main() {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(200)
 
-		<-watcher.Events
-
-		data := fmt.Sprintf("data: servus pid=%d\n\n", os.Getpid())
-		bytes, err := w.Write([]byte(data))
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		fmt.Printf("[%d] %s", bytes, data)
+		event, _ := <-watcher.Events
+		fmt.Fprintf(w, "data: servus pid=%d %s\n\n", os.Getpid(), event)
 	})
 
 	http.HandleFunc("GET /{file}", func(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +57,8 @@ func main() {
 		w.Write([]byte(script))
 		io.Copy(w, file)
 	})
-	fmt.Printf("pid=%d url=http://localhost:3000\n", os.Getpid())
+
+	logger.Printf("pid=%d url=http://localhost:3000\n", os.Getpid())
 	err := http.ListenAndServe(":3000", nil)
 	if err != nil {
 		panic(err)
