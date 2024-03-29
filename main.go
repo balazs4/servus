@@ -14,17 +14,21 @@ func main() {
 	signalchan := make(chan os.Signal, 1)
 	signal.Notify(signalchan, syscall.SIGUSR2)
 
-	script := `<script> new EventSource('/.servus').onmessage = function(){ console.log("data"); location.reload(); }</script>`
+	script := `<script> new EventSource(".servus").onmessage = function(ev){ console.log(ev); window.location.reload();}</script>`
 	http.HandleFunc("GET /.servus", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(200)
-		w.Header().Add("content-type", "text/event-stream")
-		w.Header().Add("connection", "keep-alive")
-		w.Header().Add("cache-control", "no-cache")
 
 		<-signalchan
-    fmt.Println("SIGUSR2");
-		data := fmt.Sprintf("data: servus pid %d\n\n", os.Getpid())
-		w.Write([]byte(data))
+		data := fmt.Sprintf("data: servus pid=%d\n\n", os.Getpid())
+		bytes, err := w.Write([]byte(data))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Printf("[%d] %s", bytes, data)
 	})
 
 	http.HandleFunc("GET /{file}", func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +45,7 @@ func main() {
 		w.Write([]byte(script))
 		io.Copy(w, file)
 	})
-	fmt.Printf("pid=%d url=http://localhost:3000", os.Getpid())
+	fmt.Printf("pid=%d url=http://localhost:3000\n", os.Getpid())
 	err := http.ListenAndServe(":3000", nil)
 	if err != nil {
 		panic(err)
