@@ -6,29 +6,42 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
+	"strconv"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
 )
 
-
 func main() {
 	logger := log.New(os.Stderr, "[servus] ", log.LstdFlags)
-	watcher := Watcher(logger, os.Args[1])
+	port, errport := strconv.Atoi(os.Getenv("PORT"))
+	if errport != nil {
+		port = 3000
+	}
+
+	working_dir := "./"
+	if len(os.Args) == 2 {
+		working_dir = os.Args[1]
+	}
+
+	watcher := Watcher(logger, working_dir)
 	defer watcher.Close()
 
-	http.HandleFunc("GET /.servus", ServerSideEvent(logger, watcher))
-	http.HandleFunc("GET /{file}", ServeFile(logger))
+	logger.Printf("watching %s", watcher.WatchList()[0])
 
-	logger.Printf("pid=%d url=http://localhost:3000\n", os.Getpid())
-	err := http.ListenAndServe(":3000", nil)
+	http.HandleFunc("GET /.servus", ServerSideEvent(logger, watcher))
+	http.HandleFunc("GET /{file}", ServeFile(logger, working_dir))
+
+	logger.Printf("pid=%d url=http://localhost:%d\n", os.Getpid(), port)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 
 	if err != nil {
 		panic(err)
 	}
 }
 
-func ServeFile(logger *log.Logger) func(w http.ResponseWriter, r *http.Request) {
+func ServeFile(logger *log.Logger, working_dir string) func(w http.ResponseWriter, r *http.Request) {
 	const script = `<script> new EventSource(".servus").onmessage = function(ev){ console.log(ev); window.location.reload();}</script>`
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,10 +50,10 @@ func ServeFile(logger *log.Logger) func(w http.ResponseWriter, r *http.Request) 
 			http.ServeFile(w, r, name)
 			return
 		}
-		file, err := os.Open(name)
+		file, err := os.Open(path.Join(working_dir, name))
 		defer file.Close()
 		if err != nil {
-      w.WriteHeader(500)
+			w.WriteHeader(500)
 			return
 		}
 		w.Write([]byte(script))
@@ -63,7 +76,7 @@ func ServerSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.
 	}
 }
 
-func Watcher(logger *log.Logger, path string) *fsnotify.Watcher {
+func Watcher(logger *log.Logger, working_dir string) *fsnotify.Watcher {
 	watcher, watcherr := fsnotify.NewWatcher()
 	if watcherr != nil {
 		panic(watcherr)
@@ -79,7 +92,6 @@ func Watcher(logger *log.Logger, path string) *fsnotify.Watcher {
 			}
 		}
 	}()
-
-	watcher.Add("./")
+	watcher.Add(working_dir)
 	return watcher
 }
