@@ -40,7 +40,10 @@ func main() {
 		w.WriteHeader(200)
 
 		event, _ := <-watcher.Events
-		fmt.Fprintf(w, "data: servus pid=%d %s\n\n", os.Getpid(), event)
+		size, err := fmt.Fprintf(w, "data: servus pid=%d %s\n\n", os.Getpid(), event)
+		if err != nil {
+			logger.Printf("size=%d, err=%s", size, err)
+		}
 	})
 
 	http.HandleFunc("GET /{file}", func(w http.ResponseWriter, r *http.Request) {
