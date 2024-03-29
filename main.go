@@ -5,14 +5,30 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 func main() {
-	signalchan := make(chan os.Signal, 1)
-	signal.Notify(signalchan, syscall.SIGUSR2)
+	watcher, watcherr := fsnotify.NewWatcher()
+	if watcherr != nil {
+		panic(watcherr)
+	}
+	defer watcher.Close()
+
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				fmt.Printf("event=%s, ok=%t\n", event, ok)
+			case err, ok := <-watcher.Errors:
+				fmt.Printf("err=%s, ok=%t\n", err, ok)
+			}
+		}
+	}()
+
+	watcher.Add("./")
 
 	script := `<script> new EventSource(".servus").onmessage = function(ev){ console.log(ev); window.location.reload();}</script>`
 	http.HandleFunc("GET /.servus", func(w http.ResponseWriter, r *http.Request) {
@@ -21,7 +37,8 @@ func main() {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(200)
 
-		<-signalchan
+		<-watcher.Events
+
 		data := fmt.Sprintf("data: servus pid=%d\n\n", os.Getpid())
 		bytes, err := w.Write([]byte(data))
 		if err != nil {
