@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 
@@ -20,18 +19,15 @@ func main() {
 		port = 3000
 	}
 
-	working_dir := "./"
-	if len(os.Args) == 2 {
-		working_dir = os.Args[1]
-	}
-
-	watcher := Watcher(logger, working_dir)
+	watcher := createWatcher(logger, os.Args[1:])
 	defer watcher.Close()
 
-	logger.Printf("watching %s", watcher.WatchList()[0])
+	for _, p := range watcher.WatchList() {
+		logger.Printf("watching %s", p)
+	}
 
-	http.HandleFunc("GET /.servus", ServerSideEvent(logger, watcher))
-	http.HandleFunc("GET /{file}", ServeFile(logger, working_dir))
+	http.HandleFunc("GET /.servus", serverSideEvent(logger, watcher))
+	http.HandleFunc("GET /{file}", serveFile(logger))
 
 	logger.Printf("pid=%d url=http://localhost:%d\n", os.Getpid(), port)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
@@ -41,7 +37,7 @@ func main() {
 	}
 }
 
-func ServeFile(logger *log.Logger, working_dir string) func(w http.ResponseWriter, r *http.Request) {
+func serveFile(logger *log.Logger) func(w http.ResponseWriter, r *http.Request) {
 	const script = `<script> new EventSource(".servus").onmessage = function(ev){ console.log(ev); window.location.reload();}</script>`
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +46,7 @@ func ServeFile(logger *log.Logger, working_dir string) func(w http.ResponseWrite
 			http.ServeFile(w, r, name)
 			return
 		}
-		file, err := os.Open(path.Join(working_dir, name))
+		file, err := os.Open(name)
 		defer file.Close()
 		if err != nil {
 			w.WriteHeader(500)
@@ -61,7 +57,7 @@ func ServeFile(logger *log.Logger, working_dir string) func(w http.ResponseWrite
 	}
 }
 
-func ServerSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.ResponseWriter, r *http.Request) {
+func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Connection", "keep-alive")
@@ -76,7 +72,7 @@ func ServerSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.
 	}
 }
 
-func Watcher(logger *log.Logger, working_dir string) *fsnotify.Watcher {
+func createWatcher(logger *log.Logger, path []string) *fsnotify.Watcher {
 	watcher, watcherr := fsnotify.NewWatcher()
 	if watcherr != nil {
 		panic(watcherr)
@@ -92,6 +88,9 @@ func Watcher(logger *log.Logger, working_dir string) *fsnotify.Watcher {
 			}
 		}
 	}()
-	watcher.Add(working_dir)
+	watcher.Add(".")
+	for _, p := range path {
+		watcher.Add(p)
+	}
 	return watcher
 }
