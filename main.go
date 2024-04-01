@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -42,18 +43,21 @@ func serveFile(logger *log.Logger) func(w http.ResponseWriter, r *http.Request) 
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("file")
-		if strings.HasSuffix(name, ".html") == false {
-			http.ServeFile(w, r, name)
-			return
-		}
 		file, err := os.Open(name)
 		defer file.Close()
 		if err != nil {
-			w.WriteHeader(500)
+			logger.Printf("name=%s, err=%s\n", name, err)
+			http.NotFound(w, r)
 			return
 		}
-		w.Write([]byte(script))
-		io.Copy(w, file)
+		logger.Printf("[%d] %s %s\n", http.StatusOK, r.Method, name)
+		if strings.HasSuffix(name, ".html") == true {
+			w.Header().Add("X-Servus-Patch", fmt.Sprint(true))
+			io.Copy(w, file)
+			w.Write([]byte(script))
+			return
+		}
+		http.ServeContent(w, r, name, time.Now(), file)
 	}
 }
 
@@ -62,9 +66,11 @@ func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Connection", "keep-alive")
 		w.Header().Set("Cache-Control", "no-cache")
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 
-		event, _ := <-watcher.Events
+		event, ok := <-watcher.Events
+		logger.Printf("ok=%t, event=%s\n", ok, event)
+
 		size, err := fmt.Fprintf(w, "data: servus pid=%d %s\n\n", os.Getpid(), event)
 		if err != nil {
 			logger.Printf("size=%d, err=%s", size, err)
@@ -80,12 +86,8 @@ func createWatcher(logger *log.Logger, path []string) *fsnotify.Watcher {
 
 	go func() {
 		for {
-			select {
-			case event, ok := <-watcher.Events:
-				logger.Printf("ok=%t event=%s\n", ok, event)
-			case err, ok := <-watcher.Errors:
-				logger.Printf("ok=%t, err=%s\n", ok, err)
-			}
+			err, ok := <-watcher.Errors
+			logger.Printf("ok=%t, err=%s\n", ok, err)
 		}
 	}()
 	watcher.Add(".")
