@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"testing"
 	"time"
@@ -61,16 +63,42 @@ func TestServerSideEvent(t *testing.T) {
 }
 
 func TestServeFile(t *testing.T) {
+	testhtml, err := os.Create("test.html")
+	if err != nil {
+		t.Log(err)
+		t.FailNow()
+	}
+	defer func() {
+		testhtml.Close()
+		os.Remove(testhtml.Name())
+	}()
+
+	htmlcontent := "<p>test.html</p>"
+	testhtml.Write([]byte(htmlcontent))
+
 	req := httptest.NewRequest(http.MethodGet, "/test.html", nil)
 	req.SetPathValue("file", "test.html")
 	res := httptest.NewRecorder()
 
 	handler := serveFile(log.Default())
-
 	handler(res, req)
 
 	if actual := res.Result().Status; actual != "200 OK" {
 		t.Logf("Wrong status; expected='200 OK', actual='%s'", actual)
 		t.Fail()
 	}
+
+	body, err := io.ReadAll(res.Result().Body)
+	if err != nil {
+		t.Logf("Cannot read response body, err=%s", err)
+		t.FailNow()
+	}
+
+	expectedBody := fmt.Sprintf(`%s<script> new EventSource(".servus").onmessage = function(ev){ console.log(ev); window.location.reload();}</script>`, htmlcontent)
+
+	if string(body) != expectedBody {
+		t.Logf("Wrong response body\nexpected:\n%s\n=====\nactual:\n%s", expectedBody, body)
+		t.FailNow()
+	}
+
 }
