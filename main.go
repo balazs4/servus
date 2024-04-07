@@ -62,18 +62,40 @@ func serveFile(logger *log.Logger) func(w http.ResponseWriter, r *http.Request) 
 }
 
 func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.ResponseWriter, r *http.Request) {
+	eventbroker := make(map[int64]chan fsnotify.Event)
+
+	go func() {
+		for {
+			//event producer
+			event, _ := <-watcher.Events
+			if event.Has(fsnotify.Chmod) == true {
+				//ignore
+				continue
+			}
+			logger.Printf("event=%s, eventbroker=%d\n", event, len(eventbroker))
+			for _, consumer := range eventbroker {
+				consumer <- event
+			}
+		}
+	}()
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Connection", "keep-alive")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(http.StatusOK)
 
-		event, ok := <-watcher.Events
-		logger.Printf("ok=%t, event=%s\n", ok, event)
-
-		size, err := fmt.Fprintf(w, "data: servus pid=%d %s\n\n", os.Getpid(), event)
-		if err != nil {
-			logger.Printf("size=%d, err=%s", size, err)
+		id := time.Now().UnixNano()
+		eventbroker[id] = make(chan fsnotify.Event)
+		select {
+		case event := <-eventbroker[id]:
+			delete(eventbroker, id)
+			size, err := fmt.Fprintf(w, "data: servus pid=%d %s\n\n", os.Getpid(), event)
+			if err != nil {
+				logger.Printf("size=%d, err=%s", size, err)
+			}
+		case <-r.Context().Done():
+			delete(eventbroker, id)
 		}
 	}
 }
