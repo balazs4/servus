@@ -1,6 +1,6 @@
 on: push
 jobs:
-  test:
+  test-build-fmt:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -10,7 +10,7 @@ jobs:
       - run: make test
       - run: make build
       - run: |
-          diff=$(gofmt -d -e -l)
+          diff=$(gofmt -d -e .)
           test -z "$diff" || {
             echo "$diff"
             echo "forgot to run `make fmt`?"
