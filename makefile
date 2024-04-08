@@ -22,4 +22,4 @@ test:
 
 .PHONY: release
 release:
-	gh release create  v1.$(date '+%Y%m%d.%H%M') --generate-notes
+	gh release create  "v1.$$(date '+%Y%m%d.%H%M')" --generate-notes
