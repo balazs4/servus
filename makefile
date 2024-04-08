@@ -19,3 +19,7 @@ clean:
 .PHONY: test
 test:
 	go test -test.v ./...
+
+.PHONY: release
+release:
+	gh release create  v1.$(date '+%Y%m%d.%H%M') --generate-notes
