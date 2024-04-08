@@ -1,0 +1,27 @@
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goosarch:
+          - 'linux/amd64'
+          - 'linux/amd64'
+          - 'darwin/arm64'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: './go.mod'
+      - run: |
+          GOOSARCH=${{matrix.goosarch}}
+          GOOS=${GOOSARCH%/*}
+          GOARCH=${GOOSARCH#*/}
+          BINARY_NAME=${{github.repository}}-$GOOS-$GOARCH
+          go build -o "$BINARY_NAME" -v
+          gh release upload ${{ github.ref_name }} "$BINARY_NAME"
+
