@@ -5,9 +5,9 @@
 ## usage
 
 ```sh
-servus # watches current directory (non-recursive)
+servus                # watches current directory (non-recursive)
 servus `git ls-files` # watches all files in git repository
-PORT=4269 servus # set custom port number 
+PORT=4269 servus      # set custom port number 
 ```
 
 ## install
