@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -77,17 +78,39 @@ func serveFile(logger *log.Logger) func(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+type FsEvent struct {
+	sync.Mutex
+	Consumers map[int64]*chan fsnotify.Event
+}
+
+func (f *FsEvent) Subscribe(id int64, consumer *chan fsnotify.Event) {
+	f.Lock()
+	defer f.Unlock()
+	f.Consumers[id] = consumer
+}
+
+func (f *FsEvent) Unsubscribe(id int64) {
+	f.Lock()
+	defer f.Unlock()
+	delete(f.Consumers, id)
+}
+
 func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.ResponseWriter, r *http.Request) {
-	eventbroadcast := make(map[int64]chan fsnotify.Event)
+	eventbroadcast := FsEvent{
+		Consumers: make(map[int64]*chan fsnotify.Event),
+	}
 
 	go func() {
 		for {
-			logger.Printf("waiting for changes, eventbroadcast=%d\n", len(eventbroadcast))
 			event, _ := <-watcher.Events
-			logger.Printf("event=%s, eventbroadcast=%d\n", event, len(eventbroadcast))
-			for _, consumer := range eventbroadcast {
-				consumer <- event
+			eventbroadcast.Lock()
+			logger.Printf("event=%s, eventbroadcast=%d\n", event, len(eventbroadcast.Consumers))
+			for id, consumer := range eventbroadcast.Consumers {
+				delete(eventbroadcast.Consumers, id)
+				logger.Printf("\tevent=%s, id=%d\n", event, id)
+				*consumer <- event
 			}
+			eventbroadcast.Unlock()
 		}
 	}()
 
@@ -98,19 +121,19 @@ func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.
 		w.WriteHeader(http.StatusOK)
 
 		id := time.Now().UnixNano()
-		eventbroadcast[id] = make(chan fsnotify.Event)
-		logger.Printf("client subscribe, id=%d\n", id)
+		channel := make(chan fsnotify.Event)
+		eventbroadcast.Subscribe(id, &channel)
+		logger.Printf("client ready, id=%d\n", id)
+
 		select {
-		case event := <-eventbroadcast[id]:
-			delete(eventbroadcast, id)
-			logger.Printf("client unsubscribe, id=%d, reason=fsevent\n", id)
+		case event := <-channel:
 			size, err := fmt.Fprintf(w, "data: servus pid=%d %s\n\n", os.Getpid(), event)
 			if err != nil {
 				logger.Printf("size=%d, err=%s", size, err)
 			}
 		case <-r.Context().Done():
 			logger.Printf("client unsubscribe, id=%d, reason=context.done\n", id)
-			delete(eventbroadcast, id)
+			eventbroadcast.Unsubscribe(id)
 		}
 	}
 }
