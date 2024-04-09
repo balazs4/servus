@@ -78,16 +78,14 @@ func serveFile(logger *log.Logger) func(w http.ResponseWriter, r *http.Request) 
 }
 
 func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.ResponseWriter, r *http.Request) {
-	eventbroker := make(map[int64]chan fsnotify.Event)
+	eventbroadcast := make(map[int64]chan fsnotify.Event)
 
 	go func() {
 		for {
+			logger.Printf("waiting for changes, eventbroadcast=%d\n", len(eventbroadcast))
 			event, _ := <-watcher.Events
-			if event.Has(fsnotify.Chmod) == true {
-				continue
-			}
-			logger.Printf("event=%s, eventbroker=%d\n", event, len(eventbroker))
-			for _, consumer := range eventbroker {
+			logger.Printf("event=%s, eventbroadcast=%d\n", event, len(eventbroadcast))
+			for _, consumer := range eventbroadcast {
 				consumer <- event
 			}
 		}
@@ -100,16 +98,19 @@ func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.
 		w.WriteHeader(http.StatusOK)
 
 		id := time.Now().UnixNano()
-		eventbroker[id] = make(chan fsnotify.Event)
+		eventbroadcast[id] = make(chan fsnotify.Event)
+		logger.Printf("client subscribe, id=%d\n", id)
 		select {
-		case event := <-eventbroker[id]:
-			delete(eventbroker, id)
+		case event := <-eventbroadcast[id]:
+			delete(eventbroadcast, id)
+			logger.Printf("client unsubscribe, id=%d, reason=fsevent\n", id)
 			size, err := fmt.Fprintf(w, "data: servus pid=%d %s\n\n", os.Getpid(), event)
 			if err != nil {
 				logger.Printf("size=%d, err=%s", size, err)
 			}
 		case <-r.Context().Done():
-			delete(eventbroker, id)
+			logger.Printf("client unsubscribe, id=%d, reason=context.done\n", id)
+			delete(eventbroadcast, id)
 		}
 	}
 }
