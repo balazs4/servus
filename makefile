@@ -1,20 +1,17 @@
-servus: clean fmt test build
+servus: fmt test build
 
 .PHONY: fmt
 fmt:
 	go fmt .
 
-.PHONY: fmt
+.PHONY: run
 run:
 	go run .
 
 .PHONY: build
 build:
-	go build .
-
-.PHONY: clean
-clean:
 	go clean .
+	go build .
 
 .PHONY: test
 test:

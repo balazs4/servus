@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -14,7 +15,9 @@ import (
 )
 
 func main() {
-	logger := log.New(os.Stderr, "[servus] ", log.LstdFlags)
+	logger := log.New(os.Stderr, fmt.Sprintf("[servus] "), log.LstdFlags)
+	logger.Printf("version=%s", getVersion())
+
 	port, errport := strconv.Atoi(os.Getenv("PORT"))
 	if errport != nil {
 		port = 3000
@@ -22,10 +25,6 @@ func main() {
 
 	watcher := createWatcher(logger, os.Args[1:])
 	defer watcher.Close()
-
-	for _, p := range watcher.WatchList() {
-		logger.Printf("watching %s", p)
-	}
 
 	http.HandleFunc("GET /.servus", serverSideEvent(logger, watcher))
 	http.HandleFunc("GET /{file}", serveFile(logger))
@@ -36,6 +35,23 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+var Version string
+
+func getVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if ok == true {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" {
+				return fmt.Sprintf("%s (%s)", Version, setting.Value)
+			}
+		}
+	}
+	if Version != "" {
+		return fmt.Sprintf("%s", Version)
+	}
+	return "dev"
 }
 
 func serveFile(logger *log.Logger) func(w http.ResponseWriter, r *http.Request) {
@@ -66,10 +82,8 @@ func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.
 
 	go func() {
 		for {
-			//event producer
 			event, _ := <-watcher.Events
 			if event.Has(fsnotify.Chmod) == true {
-				//ignore
 				continue
 			}
 			logger.Printf("event=%s, eventbroker=%d\n", event, len(eventbroker))
@@ -112,9 +126,15 @@ func createWatcher(logger *log.Logger, path []string) *fsnotify.Watcher {
 			logger.Printf("ok=%t, err=%s\n", ok, err)
 		}
 	}()
+
 	watcher.Add(".")
 	for _, p := range path {
 		watcher.Add(p)
 	}
+
+	for _, p := range watcher.WatchList() {
+		logger.Printf("watch=%s", p)
+	}
+
 	return watcher
 }

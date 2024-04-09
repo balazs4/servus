@@ -22,7 +22,7 @@ jobs:
           GOOS=${GOOSARCH%/*}
           GOARCH=${GOOSARCH#*/}
           BINARY_NAME=${{github.repository}}-$GOOS-$GOARCH
-          go build -o "$BINARY_NAME" -v
+          go build -o "$BINARY_NAME" -v -ldflags '-X main.Version=${{ github.ref_name }}'
           gh release upload ${{ github.ref_name }} "$BINARY_NAME"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
