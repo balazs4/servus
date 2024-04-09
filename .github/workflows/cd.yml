@@ -19,8 +19,8 @@ jobs:
           go-version-file: './go.mod'
       - run: |
           GOOSARCH=${{matrix.goosarch}}
-          GOOS=${GOOSARCH%/*}
-          GOARCH=${GOOSARCH#*/}
+          export GOOS=${GOOSARCH%/*}
+          export GOARCH=${GOOSARCH#*/}
           BINARY_NAME=${{github.repository}}-$GOOS-$GOARCH
           go build -o "$BINARY_NAME" -v -ldflags '-X main.Version=${{ github.ref_name }}'
           gh release upload ${{ github.ref_name }} "$BINARY_NAME"
