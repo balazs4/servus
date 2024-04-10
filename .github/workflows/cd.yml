@@ -27,4 +27,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
+  release:
+    needs: [ build ]
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh release edit ${{ github.ref_name }} --latest
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 

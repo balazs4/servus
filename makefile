@@ -19,4 +19,4 @@ test:
 
 .PHONY: release
 release:
-	gh release create  "v1.$$(date -u '+%Y%m%dT%H%MZ')" --generate-notes
+	gh release create  "v1.$$(date -u '+%Y%m%dT%H%MZ')" --generate-notes --prerelease
