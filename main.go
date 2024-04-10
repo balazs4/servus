@@ -29,6 +29,7 @@ func main() {
 
 	http.HandleFunc("GET /.servus", serverSideEvent(logger, watcher))
 	http.HandleFunc("GET /{file}", serveFile(logger))
+	http.Handle("GET /", http.RedirectHandler("/index.html", http.StatusSeeOther))
 
 	logger.Printf("pid=%d url=http://localhost:%d\n", os.Getpid(), port)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
