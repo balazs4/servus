@@ -63,7 +63,7 @@ func serveFile(logger *log.Logger) func(w http.ResponseWriter, r *http.Request) 
 		file, err := os.Open(name)
 		defer file.Close()
 		if err != nil {
-			logger.Printf("name=%s, err=%s\n", name, err)
+			logger.Printf("[%d] %s %s, err=%s\n", http.StatusNotFound, r.Method, name, err)
 			http.NotFound(w, r)
 			return
 		}
@@ -104,10 +104,14 @@ func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.
 		for {
 			event, _ := <-watcher.Events
 			eventbroadcast.Lock()
-			logger.Printf("event=%s, eventbroadcast=%d\n", event, len(eventbroadcast.Consumers))
+			count := len(eventbroadcast.Consumers)
+			if count == 0 {
+				eventbroadcast.Unlock()
+				continue
+			}
+			logger.Printf("event=%s, consumers=%d\n", event, count)
 			for id, consumer := range eventbroadcast.Consumers {
 				delete(eventbroadcast.Consumers, id)
-				logger.Printf("\tevent=%s, id=%d\n", event, id)
 				*consumer <- event
 			}
 			eventbroadcast.Unlock()
@@ -123,7 +127,6 @@ func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.
 		id := time.Now().UnixNano()
 		channel := make(chan fsnotify.Event)
 		eventbroadcast.Subscribe(id, &channel)
-		logger.Printf("client ready, id=%d\n", id)
 
 		select {
 		case event := <-channel:
@@ -132,7 +135,6 @@ func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.
 				logger.Printf("size=%d, err=%s", size, err)
 			}
 		case <-r.Context().Done():
-			logger.Printf("client unsubscribe, id=%d, reason=context.done\n", id)
 			eventbroadcast.Unsubscribe(id)
 		}
 	}
