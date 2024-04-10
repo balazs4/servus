@@ -43,17 +43,15 @@ var Version string
 
 func getVersion() string {
 	info, ok := debug.ReadBuildInfo()
-	if ok == true {
-		for _, setting := range info.Settings {
-			if setting.Key == "vcs.revision" {
-				return fmt.Sprintf("%s (%s)", Version, setting.Value)
-			}
-		}
+	if ok == false {
+		return "???"
 	}
+
 	if Version != "" {
-		return fmt.Sprintf("%s", Version)
+		return Version
 	}
-	return "dev"
+
+	return info.Main.Version
 }
 
 func serveFile(logger *log.Logger) func(w http.ResponseWriter, r *http.Request) {
