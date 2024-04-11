@@ -13,7 +13,7 @@ PORT=4269 servus      # set custom port number
 ## install
 
 ```sh
-go install github.com/balazs4/servus
+GOPROXY=direct go install github.com/balazs4/servus
 ```
 
 or download [pre-built binary](https://github.com/balazs4/servus/releases).
