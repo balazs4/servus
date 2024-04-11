@@ -19,4 +19,4 @@ test:
 
 .PHONY: release
 release:
-	gh release create $(v) --generate-notes --prerelease
+	gh release create $(version) --generate-notes --prerelease
