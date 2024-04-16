@@ -8,32 +8,30 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goosarch:
-          - 'linux/amd64'
-          - 'linux/arm64'
-          - 'darwin/arm64'
+        include:
+          - { arch: amd64, os: linux }
+          - { arch: arm64, os: linux }
+          - { arch: arm64, os: darwin }
+    env:
+      BINARY_NAME: ${{ github.repository }}-${{ matrix.os }}-${{ matrix.arch }}
+      GOARCH: ${{ matrix.arch }}
+      GOOS: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: './go.mod'
-      - run: |
-          GOOSARCH=${{matrix.goosarch}}
-          export GOOS=${GOOSARCH%/*}
-          export GOARCH=${GOOSARCH#*/}
-          BINARY_NAME=${{github.repository}}-$GOOS-$GOARCH
-          go build -o "$BINARY_NAME" -v -ldflags '-X main.Version=${{ github.ref_name }}'
-          gh release upload ${{ github.ref_name }} "$BINARY_NAME"
+      - run: go build -o "$BINARY_NAME" -v -ldflags '-X main.Version=${{ github.ref_name }}'
+      - run: gh release upload ${{ github.ref_name }} "$BINARY_NAME"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
   release:
-    needs: [ build ]
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          gh release edit ${{ github.ref_name }} --prerelease=false --latest
+      - run: gh release edit ${{ github.ref_name }} --prerelease=false --latest
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
