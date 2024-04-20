@@ -15,6 +15,7 @@ import (
 )
 
 func TestServerSideEvent(t *testing.T) {
+	log.SetOutput(io.Discard)
 	req := httptest.NewRequest(http.MethodGet, "/.servus", nil)
 	res := httptest.NewRecorder()
 

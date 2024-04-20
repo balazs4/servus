@@ -15,7 +15,7 @@ build:
 
 .PHONY: test
 test:
-	go test -test.v ./...
+	go test ./...
 
 .PHONY: release
 release:
