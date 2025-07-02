@@ -14,13 +14,13 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-func TestServerSideEvent(t *testing.T) {
+func TestServerSentEvent(t *testing.T) {
 	log.SetOutput(io.Discard)
 	req := httptest.NewRequest(http.MethodGet, "/.servus", nil)
 	res := httptest.NewRecorder()
 
 	events := make(chan fsnotify.Event, 1)
-	handler := serverSideEvent(log.Default(), &fsnotify.Watcher{Events: events})
+	handler := serverSentEvent(log.Default(), &fsnotify.Watcher{Events: events})
 
 	go func() {
 		time.Sleep(250 * time.Millisecond)

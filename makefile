@@ -18,9 +18,9 @@ test:
 	go test -v ./...
 
 .PHONY: release
-release:
+release: level=minor
 	@gh release list --exclude-drafts --json 'tagName' --jq '.[].tagName' \
 		| sort -h \
 		| tail -1 \
-		| xargs -t -I{} bun x semver --inc ${level} {} \
+		| xargs -t -I{} bun x semver --inc $(level) {} \
 		| xargs -t -I{} gh release create v{} --generate-notes --prerelease

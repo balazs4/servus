@@ -27,7 +27,7 @@ func main() {
 	watcher := createWatcher(logger, os.Args[1:])
 	defer watcher.Close()
 
-	http.HandleFunc("GET /.servus", serverSideEvent(logger, watcher))
+	http.HandleFunc("GET /.servus", serverSentEvent(logger, watcher))
 	http.HandleFunc("GET /{file}", serveFile(logger))
 	http.Handle("GET /", http.RedirectHandler("/index.html", http.StatusSeeOther))
 
@@ -94,7 +94,7 @@ func (f *FsEvent) Unsubscribe(id int64) {
 	delete(f.Consumers, id)
 }
 
-func serverSideEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.ResponseWriter, r *http.Request) {
+func serverSentEvent(logger *log.Logger, watcher *fsnotify.Watcher) func(w http.ResponseWriter, r *http.Request) {
 	eventbroadcast := FsEvent{
 		Consumers: make(map[int64]*chan fsnotify.Event),
 	}
