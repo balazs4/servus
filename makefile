@@ -18,7 +18,7 @@ test:
 	go test -v ./...
 
 .PHONY: release
-release: level=minor
+release:
 	@gh release list --exclude-drafts --json 'tagName' --jq '.[].tagName' \
 		| sort -h \
 		| tail -1 \
